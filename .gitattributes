@@ -1,8 +1,10 @@
 # 统一换行：源码用 LF，避免 Windows/Linux 混用时整文件 diff
 * text=auto eol=lf
 
-# 脚本必须是 LF，否则在 bash 下会报 "bad interpreter"
+# 脚本行尾有讲究：sh 必须 LF，bat/cmd 必须 CRLF（否则 Windows 解析错乱）
 *.sh text eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
 
 # 二进制资源不做换行转换
 *.png binary
