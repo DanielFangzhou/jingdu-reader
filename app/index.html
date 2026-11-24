@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' blob:; img-src 'self' data: blob: book:; font-src 'self' data: blob: book:; connect-src 'self' blob: data: book:; frame-src 'self' blob: data: book:; media-src 'self' blob: data: book:; child-src 'self' blob: data: book:" />
+<title>静读</title>
+<link rel="stylesheet" href="./css/app.css" />
+</head>
+<body>
+
+<!-- ================= 图标 ================= -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H19v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 18.5A2.5 2.5 0 0 1 6.5 16H19"/></symbol>
+  <symbol id="i-shelf" viewBox="0 0 24 24"><path d="M4 4h4v16H4zM10 4h4v16h-4z"/><path d="M16.6 5.1l3.4-.9 2.6 15.3-3.4.6z"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M4 6h16M4 12h11M4 18h13"/></symbol>
+  <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M6 3.5h12v17l-6-4.2-6 4.2z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M9 3h6l-1 6 4 4v2H6v-2l4-4z"/><path d="M12 15v6"/></symbol>
+  <symbol id="i-min" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  <symbol id="i-max" viewBox="0 0 24 24"><rect x="5.5" y="5.5" width="13" height="13" rx="1.5"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.2" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13"/></symbol>
+  <symbol id="i-note" viewBox="0 0 24 24"><path d="M5 4h14v11l-5 5H5z"/><path d="M14 20v-5h5"/></symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M9.5 6l6 6-6 6"/></symbol>
+  <symbol id="i-left" viewBox="0 0 24 24"><path d="M14.5 6l-6 6 6 6"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="M9.5 6l6 6-6 6"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4l2 2.5h7A1.5 1.5 0 0 1 19 10v7a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 3 17z"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M15 6.5A1.5 1.5 0 0 0 13.5 5H6a1.5 1.5 0 0 0-1.5 1.5v7A1.5 1.5 0 0 0 6 15"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 13l4.5 4.5L19 7"/></symbol>
+  <symbol id="i-sort" viewBox="0 0 24 24"><path d="M7 4v16M7 20l-3-3M7 20l3-3M17 20V4M17 4l-3 3M17 4l3 3"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.5-5.8"/><path d="M20 4v4.5h-4.5"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.8v.6"/></symbol>
+  <symbol id="i-type" viewBox="0 0 24 24"><path d="M5 19l5.5-14L16 19M7.2 14.5h6.6"/><path d="M18 12v7M15.5 14.5H20.5"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 6 12 6s9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6z"/><circle cx="12" cy="12" r="2.6"/></symbol>
+</svg>
+
+<div id="app">
+  <!-- ================= 标题栏 ================= -->
+  <header id="titlebar">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H19v15H6.5A2.5 2.5 0 0 0 4 20.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8.5 8h7M8.5 11.5h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <span>静读</span>
+    </div>
+
+    <button id="btn-shelf" class="tb-btn hidden" title="回到书架 (Ctrl+L)">
+      <svg class="i"><use href="#i-shelf"/></svg>
+    </button>
+
+    <div class="tb-title">
+      <span id="book-title">我的书架</span>
+      <span id="book-sub"></span>
+    </div>
+
+    <div class="tb-drag"></div>
+
+    <button id="btn-toc" class="tb-btn reader-only hidden" title="目录 (Ctrl+T)">
+      <svg class="i"><use href="#i-list"/></svg><span>目录</span>
+    </button>
+    <button id="btn-mark" class="tb-btn reader-only hidden" title="书签 / 笔记 (Ctrl+B)">
+      <svg class="i"><use href="#i-bookmark"/></svg><span>书签</span>
+    </button>
+    <button id="btn-search" class="tb-btn reader-only hidden" title="全文搜索 (Ctrl+F)">
+      <svg class="i"><use href="#i-search"/></svg><span>搜索</span>
+    </button>
+    <button id="btn-style" class="tb-btn reader-only hidden" title="排版设置 (Ctrl+,)">
+      <svg class="i"><use href="#i-type"/></svg><span>排版</span>
+    </button>
+
+    <span class="tb-sep reader-only hidden"></span>
+
+    <button id="btn-top" class="tb-icon" title="窗口置顶">
+      <svg class="i"><use href="#i-pin"/></svg>
+    </button>
+    <button id="btn-min" class="tb-icon" title="最小化到托盘 (Ctrl+Alt+H)">
+      <svg class="i"><use href="#i-min"/></svg>
+    </button>
+    <button id="btn-max" class="tb-icon" title="最大化 / 还原">
+      <svg class="i"><use href="#i-max"/></svg>
+    </button>
+    <button id="btn-close" class="tb-icon" title="关闭（可在设置中改为退出）">
+      <svg class="i"><use href="#i-close"/></svg>
+    </button>
+  </header>
+
+  <!-- ================= 书架 ================= -->
+  <section id="shelf">
+    <div class="shelf-head">
+      <h1>我的书架 <small id="shelf-count"></small></h1>
+      <div class="spacer"></div>
+      <div class="search-box">
+        <svg class="i i-sm"><use href="#i-search"/></svg>
+        <input id="shelf-search" type="text" placeholder="搜索书名 / 作者" spellcheck="false" />
+      </div>
+      <select id="shelf-sort" class="mini" title="排序">
+        <option value="recent">最近阅读</option>
+        <option value="added">最近添加</option>
+        <option value="title">书名</option>
+        <option value="author">作者</option>
+      </select>
+      <button id="btn-import" class="btn primary">
+        <svg class="i i-sm"><use href="#i-plus"/></svg>导入书籍
+      </button>
+    </div>
+
+    <div class="shelf-scroll">
+      <div id="book-grid" class="grid"></div>
+      <div id="shelf-empty" class="empty hidden">
+        <svg class="art" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 26a6 6 0 0 1 6-6h24v54H24a6 6 0 0 0-6 6z"/>
+          <path d="M82 26a6 6 0 0 0-6-6H52v54h24a6 6 0 0 1 6 6z"/>
+          <path d="M30 34h10M60 34h10M30 44h8M62 44h8" opacity=".55"/>
+        </svg>
+        <h2>书架还是空的</h2>
+        <p>支持 EPUB / MOBI / AZW3 / TXT / FB2 / CBZ<br/>点右上角「导入书籍」，或直接把书拖进窗口</p>
+        <div class="drop-hint">也可以把整个文件夹拖进来批量导入</div>
+      </div>
+    </div>
+
+    <div class="shelf-foot">
+      <span id="foot-count"></span>
+      <span id="foot-today"></span>
+      <div style="flex:1"></div>
+      <span id="foot-data"></span>
+    </div>
+  </section>
+
+  <!-- ================= 阅读区 ================= -->
+  <section id="reader" class="hidden">
+    <aside id="sidebar">
+      <div class="side-tabs">
+        <button data-pane="toc" class="on">目录</button>
+        <button data-pane="marks">书签</button>
+        <button data-pane="search">搜索</button>
+        <button data-pane="info">信息</button>
+      </div>
+      <div class="side-tools hidden" id="side-search-tools">
+        <div class="search-box">
+          <svg class="i i-sm"><use href="#i-search"/></svg>
+          <input id="search-input" type="text" placeholder="在本书中搜索…" spellcheck="false" />
+        </div>
+      </div>
+      <div class="pane" id="pane-toc"></div>
+      <div class="pane hidden" id="pane-marks"></div>
+      <div class="pane hidden" id="pane-search"></div>
+      <div class="pane hidden" id="pane-info"></div>
+    </aside>
+
+    <main id="stage">
+      <div id="view-host"></div>
+      <div class="page-turn left" id="turn-left"></div>
+      <div class="page-turn right" id="turn-right"></div>
+      <div id="loading" class="hidden">
+        <div class="spinner"></div>
+        <span id="loading-text">正在打开…</span>
+      </div>
+    </main>
+  </section>
+
+  <!-- ================= 状态栏 ================= -->
+  <footer id="statusbar" class="hidden">
+    <span id="st-chapter">—</span>
+    <div id="st-progress">
+      <input id="progress" type="range" min="0" max="1" step="0.0002" value="0" />
+    </div>
+    <span id="st-percent">0%</span>
+    <span id="st-page"></span>
+    <span id="st-clock"></span>
+  </footer>
+</div>
+
+<!-- ================= 排版面板 ================= -->
+<div id="style-panel">
+  <div class="sp-head">
+    <span>排版与外观</span>
+    <button id="sp-close" class="tb-icon" title="关闭">
+      <svg class="i"><use href="#i-close"/></svg>
+    </button>
+  </div>
+  <div class="sp-body">
+
+    <div class="sect">
+      <div class="sect-title">主题</div>
+      <div class="themes">
+        <button class="swatch" data-theme="paper" title="纸白">A</button>
+        <button class="swatch" data-theme="sepia" title="米黄">A</button>
+        <button class="swatch" data-theme="green" title="护眼">A</button>
+        <button class="swatch" data-theme="night" title="夜间">A</button>
+        <button class="swatch" data-theme="gray" title="深灰">A</button>
+        <button class="swatch" data-theme="custom" title="自定义">自</button>
+      </div>
+      <div class="row">
+        <label>背景色</label>
+        <div class="ctl color-row">
+          <input type="color" id="set-bg" value="#f6f1e6" />
+          <span class="hint" style="margin:0">正文底色</span>
+        </div>
+      </div>
+      <div class="row">
+        <label>文字色</label>
+        <div class="ctl color-row">
+          <input type="color" id="set-fg" value="#4a4132" />
+          <span class="hint" style="margin:0">正文颜色</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sect">
+      <div class="sect-title">字体</div>
+      <div class="row">
+        <label>字体</label>
+        <div class="ctl">
+          <select id="set-font" class="field" style="flex:1">
+            <option value="system">系统默认（微软雅黑）</option>
+            <option value="'Microsoft YaHei UI','Microsoft YaHei',sans-serif">微软雅黑</option>
+            <option value="'SimSun','宋体',serif">宋体</option>
+            <option value="'SimHei','黑体',sans-serif">黑体</option>
+            <option value="'KaiTi','楷体',serif">楷体</option>
+            <option value="'FangSong','仿宋',serif">仿宋</option>
+            <option value="'DengXian','等线',sans-serif">等线</option>
+            <option value="'Source Han Serif SC','Noto Serif CJK SC','Songti SC',serif">思源宋体</option>
+            <option value="'Source Han Sans SC','Noto Sans CJK SC',sans-serif">思源黑体</option>
+            <option value="Georgia,'Times New Roman',serif">西文衬线</option>
+            <option value="custom">自定义…</option>
+          </select>
+        </div>
+      </div>
+      <div class="row hidden" id="row-custom-font">
+        <label></label>
+        <div class="ctl"><input id="set-font-custom" class="field" type="text" style="width:100%" placeholder="如 'LXGW WenKai', serif" spellcheck="false" /></div>
+      </div>
+      <div class="row">
+        <label>字号</label>
+        <div class="ctl">
+          <input type="range" id="set-size" min="12" max="42" step="1" />
+          <span class="val" id="val-size">19 px</span>
+        </div>
+      </div>
+      <div class="row">
+        <label>字重</label>
+        <div class="ctl">
+          <div class="seg" data-key="fontWeight">
+            <button data-val="300">细</button>
+            <button data-val="400">正常</button>
+            <button data-val="600">加粗</button>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <label>字间距</label>
+        <div class="ctl">
+          <input type="range" id="set-ls" min="0" max="3" step="0.1" />
+          <span class="val" id="val-ls">0 px</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sect">
+      <div class="sect-title">版式</div>
+      <div class="row">
+        <label>行距</label>
+        <div class="ctl">
+          <input type="range" id="set-lh" min="1.2" max="2.8" step="0.02" />
+          <span class="val" id="val-lh">1.75</span>
+        </div>
+      </div>
+      <div class="row">
+        <label>段间距</label>
+        <div class="ctl">
+          <input type="range" id="set-para" min="0" max="2" step="0.05" />
+          <span class="val" id="val-para">0.6 em</span>
+        </div>
+      </div>
+      <div class="row">
+        <label>首行缩进</label>
+        <div class="ctl">
+          <div class="seg" data-key="textIndent">
+            <button data-val="0">无</button>
+            <button data-val="2">2 字</button>
+            <button data-val="4">4 字</button>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <label>页边距</label>
+        <div class="ctl">
+          <input type="range" id="set-margin" min="0" max="160" step="4" />
+          <span class="val" id="val-margin">48 px</span>
+        </div>
+      </div>
+      <div class="row">
+        <label>两端对齐</label>
+        <div class="ctl"><div class="switch" id="set-justify"></div></div>
+      </div>
+      <div class="row">
+        <label>英文断字</label>
+        <div class="ctl"><div class="switch" id="set-hyphen"></div></div>
+      </div>
+      <div class="row">
+        <label>翻页方式</label>
+        <div class="ctl">
+          <div class="seg" data-key="flow">
+            <button data-val="paginated">仿真翻页</button>
+            <button data-val="scrolled">上下滚动</button>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <label>分栏</label>
+        <div class="ctl">
+          <div class="seg" data-key="columns">
+            <button data-val="1">单栏</button>
+            <button data-val="2">双栏</button>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <label>页眉页码</label>
+        <div class="ctl"><div class="switch" id="set-marginal"></div></div>
+      </div>
+      <div class="row">
+        <label>点击翻页</label>
+        <div class="ctl"><div class="switch" id="set-clickturn"></div></div>
+      </div>
+    </div>
+
+    <div class="sect">
+      <div class="sect-title">窗口与隐蔽</div>
+      <div class="row">
+        <label>窗口置顶</label>
+        <div class="ctl"><div class="switch" id="set-ontop"></div></div>
+      </div>
+      <div class="row">
+        <label>自动隐藏</label>
+        <div class="ctl">
+          <input id="set-autohide" class="field" type="number" min="0" max="600" step="5" style="width:78px" />
+          <span class="hint" style="margin:0">秒（0 = 不自动隐藏）</span>
+        </div>
+      </div>
+      <div class="row">
+        <label>隐身热键</label>
+        <div class="ctl">
+          <input id="set-hotkey" class="field" type="text" style="width:100%" spellcheck="false" placeholder="CommandOrControl+Alt+B" />
+        </div>
+      </div>
+      <div class="hint">热键用于全局唤出 / 隐藏窗口。程序不在任务栏和 Alt+Tab 中显示，关闭按钮默认只是隐藏到托盘。</div>
+      <div class="row">
+        <label>关闭即退出</label>
+        <div class="ctl"><div class="switch" id="set-quitclose"></div></div>
+      </div>
+      <div class="row">
+        <label></label>
+        <div class="ctl"><button class="btn" id="btn-data-dir"><svg class="i i-sm"><use href="#i-folder"/></svg>打开数据目录</button></div>
+      </div>
+    </div>
+
+    <div class="sect">
+      <div class="row">
+        <label></label>
+        <div class="ctl">
+          <button class="btn" id="btn-reset-style"><svg class="i i-sm"><use href="#i-refresh"/></svg>恢复默认排版</button>
+        </div>
+      </div>
+      <div class="hint" id="about-line">静读 · 本地离线阅读器</div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 选区工具条 ================= -->
+<div id="sel-toolbar">
+  <button class="hb" data-color="#f5d76e" style="background:#f5d76e" title="黄色高亮"></button>
+  <button class="hb" data-color="#a8d8b9" style="background:#a8d8b9" title="绿色高亮"></button>
+  <button class="hb" data-color="#9ec7e8" style="background:#9ec7e8" title="蓝色高亮"></button>
+  <button class="hb" data-color="#f2a7a0" style="background:#f2a7a0" title="红色高亮"></button>
+  <span class="sep"></span>
+  <button class="act" data-act="note"><svg class="i i-sm"><use href="#i-note"/></svg>笔记</button>
+  <button class="act" data-act="copy"><svg class="i i-sm"><use href="#i-copy"/></svg>复制</button>
+  <button class="act" data-act="bookmark"><svg class="i i-sm"><use href="#i-bookmark"/></svg>书签</button>
+</div>
+
+<!-- ================= 右键菜单 ================= -->
+<div id="ctx-menu" class="ctx"></div>
+
+<!-- ================= 弹窗 ================= -->
+<div id="modal-backdrop">
+  <div class="modal">
+    <h3 id="modal-title">提示</h3>
+    <div class="mbody" id="modal-body"></div>
+    <div class="mfoot" id="modal-foot"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<div id="drop-veil"><div class="box">松开以导入到书架</div></div>
+
+<input type="file" id="file-input" multiple accept=".epub,.mobi,.azw3,.azw,.prc,.txt,.fb2,.fbz,.cbz" class="hidden" />
+
+<script type="module" src="./js/app.js"></script>
+</body>
+</html>

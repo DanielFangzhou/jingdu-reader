@@ -1,0 +1,17 @@
+{
+  "name": "jingdu-reader",
+  "productName": "静读",
+  "version": "1.0.0",
+  "description": "静读 · 本地离线电子书阅读器（EPUB / MOBI / AZW3 / TXT）",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron ."
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "electron": "^33.2.1",
+    "pdfjs-dist": "^4.10.38"
+  }
+}
