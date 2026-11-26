@@ -35,7 +35,7 @@ cat > "$OUT/resources/app/package.json" <<'JSON'
 {
   "name": "jingdu-reader",
   "productName": "静读",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "静读 · 本地离线电子书阅读器",
   "main": "main.js",
   "private": true,

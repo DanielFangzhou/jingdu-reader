@@ -584,7 +584,16 @@ async function openBook (b, { restart = false, silent = false } = {}) {
       const { doc } = e.detail
       doc.addEventListener('keydown', onKeyDown)
       doc.addEventListener('contextmenu', (ev) => { ev.preventDefault() })
-      if (doc !== document) doc.addEventListener('wheel', onWheelPaging, { passive: false })
+      if (doc !== document) {
+        doc.addEventListener('wheel', onWheelPaging, { passive: false })
+        // 正文跑在 iframe 里，事件不会冒泡到顶层窗口，单独上报给自动隐藏计时
+        const touchIdle = () => S.__idleTouch?.()
+        doc.addEventListener('mousemove', touchIdle, { passive: true })
+        doc.addEventListener('mousedown', touchIdle, true)
+        doc.addEventListener('wheel', touchIdle, { passive: true })
+        doc.addEventListener('scroll', touchIdle, { passive: true })
+        doc.addEventListener('keydown', touchIdle, true)
+      }
     })
   }
   reader.addEventListener('selection', (e) => showSelection(e.detail))
@@ -1403,30 +1412,46 @@ function isPdfBook () {
 }
 
 // ============================================================ 隐蔽行为
+// 自动隐藏：用「最后活动时间戳 + 每秒轮询」判断是否空闲。
+// 早期实现用 setTimeout 计时，又用 setInterval 每 15 秒“兜底重置”，
+// 结果秒数大于 15 时倒计时会被反复清零、永远走不到终点
+// （表现就是：设小秒数正常，调大后无论等多久都不隐藏）。
 function bindStealth () {
-  let idleTimer = null
-  let hidden = false
-  const resetIdle = () => {
-    clearTimeout(idleTimer)
+  const stat = (S.__idle = { ticks: 0, hides: 0, errors: 0, lastActivity: Date.now() })
+  let hiding = false
+  const touch = () => { stat.lastActivity = Date.now() }
+  S.__idleTouch = touch
+
+  window.addEventListener('mousemove', touch, { passive: true })
+  window.addEventListener('mousedown', touch, true)
+  window.addEventListener('keydown', touch, true)
+  window.addEventListener('wheel', touch, { passive: true })
+  window.addEventListener('touchstart', touch, { passive: true })
+  window.addEventListener('focus', touch)
+  // 主进程唤出窗口时（热键 / 托盘 / 程序内隐藏后恢复）重新计时
+  try { window.desktop.win.onRevealed?.(touch) } catch { /* 兼容旧版 preload */ }
+
+  setInterval(() => {
+    stat.ticks++
     const sec = Number(S.settings.autoHideSeconds) || 0
     if (sec <= 0) return
-    idleTimer = setTimeout(async () => {
-      if (document.visibilityState !== 'visible') return
+    if (Date.now() - stat.lastActivity < sec * 1000) return
+    if (hiding) return
+    hiding = true
+    stat.hiding = true
+    // 兜底：不依赖 IPC 回执，2 秒后无条件解锁，避免回执丢失导致再也不隐藏
+    setTimeout(() => { hiding = false; stat.hiding = false }, 2000)
+    // 先重新计时，再发隐藏请求：即使 hide 调用出问题，秒数到了也会继续重试
+    stat.lastActivity = Date.now()
+    try {
       hideSelection()
       hideContextMenu()
-      $('#style-panel').classList.remove('open')
-      await window.desktop.win.hide()
-      hidden = true
-    }, sec * 1000)
-  }
-  window.addEventListener('mousemove', resetIdle, { passive: true })
-  window.addEventListener('keydown', resetIdle, true)
-  window.addEventListener('mousedown', resetIdle, true)
-  window.addEventListener('wheel', resetIdle, { passive: true })
-  // 窗口重新获得焦点后重新计时
-  window.addEventListener('focus', () => { resetIdle() })
-  setTimeout(resetIdle, 500)
-  setInterval(resetIdle, 15000)
+      $('#style-panel')?.classList.remove('open')
+    } catch { /* 面板状态清理失败不影响隐藏 */ }
+    window.desktop.win.hide()
+      .then(() => { stat.hides++ })
+      .catch((e) => { stat.errors++; console.warn('自动隐藏失败：', e) })
+  }, 1000)
 }
 
 // ============================================================ 存储

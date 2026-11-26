@@ -152,14 +152,18 @@ function revealWindow () {
   win.show()
   win.focus()
   win.setAlwaysOnTop(!!settings.alwaysOnTop, 'floating')
+  // 通知渲染层重新开始空闲计时，避免唤出后立刻又被自动隐藏
+  try { win.webContents.send('win:revealed') } catch { /* 页面还没就绪 */ }
   return win
 }
 
 function hideWindow () {
-  if (!win) return
+  if (!win) return false
+  const wasVisible = win.isVisible()
   if (win.isFullScreen()) win.setFullScreen(false)
   win.hide()
   if (!tray) createTray()
+  return wasVisible
 }
 
 function toggleWindow () {
@@ -372,7 +376,7 @@ ipcMain.handle('shell:openExternal', (e, url) => {
   return true
 })
 
-ipcMain.handle('win:hide', () => { hideWindow(); return true })
+ipcMain.handle('win:hide', () => hideWindow())
 ipcMain.handle('win:show', () => { revealWindow(); return true })
 ipcMain.handle('win:toggleMaximize', () => {
   if (!win) return false
@@ -443,6 +447,69 @@ async function runAutotest () {
       })()
     `, true).catch(e => 'diag failed ' + e.message)
     console.log('[diag]', diag)
+    app.quit()
+    return
+  }
+
+  // 自动隐藏回归测试：空闲隐藏 / 唤出后再隐藏 / 持续活动不隐藏 / 停下后隐藏
+  if (process.argv.includes('--idletest')) {
+    const SEC = Number(process.env.IDLE_SEC || 5)
+    const idle = () => js(`JSON.stringify(__app.S.__idle)`)
+    const waitHide = async (limit = SEC + 12) => {
+      for (let i = 0; i < limit; i++) { await sleep(1000); if (!win.isVisible()) return true }
+      return false
+    }
+    const showWin = async () => { win.show(); win.focus(); await sleep(600) }
+    const touch = () => js(`__app.S.__idleTouch && __app.S.__idleTouch()`)
+
+    if (paths.length) {
+      await js(`__app.importPaths(${JSON.stringify(paths)})`)
+      await sleep(7000)
+      await js(`__app.openBook(__app.S.books[0])`)
+      await sleep(6000)
+      console.log('[idle] 已打开《' + (await js('__app.S.current && __app.S.current.title')) + '》')
+    }
+    await js(`__app.setSettings({ autoHideSeconds: ${SEC} })`)
+    await touch()
+    await sleep(300)
+    console.log(`[idle] 设定 ${SEC} 秒`)
+
+    // 0) 正文在 iframe 里，事件不会冒泡到顶层窗口，必须单独验证能重置计时
+    const iframeHit = await js(`(async () => {
+      try {
+        const r = __app.S.reader
+        const c = r && r.renderer && r.renderer.getContents ? r.renderer.getContents() : []
+        const doc = c && c[0] && c[0].doc
+        if (!doc) return 'no-iframe'
+        const before = __app.S.__idle.lastActivity
+        await new Promise(res => setTimeout(res, 1200))
+        doc.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }))
+        doc.dispatchEvent(new WheelEvent('wheel', { bubbles: true, deltaY: 1 }))
+        await new Promise(res => setTimeout(res, 80))
+        return (__app.S.__idle.lastActivity > before + 1000) ? 'PASS' : 'FAIL'
+      } catch (e) { return 'ERR ' + e.message }
+    })()`)
+    console.log(`[idle] 0) 正文内活动可重置计时: ${iframeHit}`)
+
+    const r1 = await waitHide()
+    console.log(`[idle] 1) 空闲后自动隐藏: ${r1 ? 'PASS' : 'FAIL'}`)
+    await showWin()
+    const r2 = await waitHide()
+    console.log(`[idle] 2) 唤出后再次隐藏: ${r2 ? 'PASS' : 'FAIL'}`)
+
+    await showWin()
+    let stayed = true
+    for (let i = 0; i < SEC * 2; i++) {
+      await touch()
+      await sleep(1000)
+      if (!win.isVisible()) { stayed = false; break }
+    }
+    console.log(`[idle] 3) 持续活动时不隐藏: ${stayed ? 'PASS' : 'FAIL'}`)
+
+    const r3 = await waitHide()
+    console.log(`[idle] 4) 停止活动后自动隐藏: ${r3 ? 'PASS' : 'FAIL'}`)
+    if (!r3) console.log('[idle] 第 4 步失败现场:', await idle(), 'isVisible=', win.isVisible())
+    console.log('[idle] 统计:', await idle())
     app.quit()
     return
   }

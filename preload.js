@@ -37,6 +37,11 @@ contextBridge.exposeInMainWorld('desktop', {
     setFullScreen: (on) => call('win:setFullScreen', on),
     quit: () => call('win:quit'),
     updateHotkey: (acc) => call('hotkey:update', acc),
+    // 主进程把窗口唤出时通知渲染层（自动隐藏重新计时用，比 DOM focus 可靠）
+    onRevealed: (cb) => {
+      if (typeof cb !== 'function') return
+      ipcRenderer.on('win:revealed', () => cb())
+    },
   },
 
   fs: {
