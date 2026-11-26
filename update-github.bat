@@ -49,7 +49,7 @@ set /p MSG= 说明:
 
 set "MSGFILE=%TEMP%\jingdu-msg-%RANDOM%.txt"
 if exist "%MSGFILE%" del "%MSGFILE%" >nul 2>&1
-rem 控制台是 GBK，git 要求 UTF-8：交给 PowerShell 转码，避免中文说明变乱码
+rem 控制台是 GBK、git 要 UTF-8：先转码再提交，否则中文说明会变乱码
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$m = $env:MSG; if ([string]::IsNullOrWhiteSpace($m)) { $m = '更新 ' + (Get-Date -Format 'yyyy-MM-dd HH:mm') }; [IO.File]::WriteAllText($env:MSGFILE, $m.Trim(), (New-Object Text.UTF8Encoding $false))" >nul 2>nul
 if not exist "%MSGFILE%" goto :msgfallback
 
@@ -64,6 +64,23 @@ goto :push
 echo [3/4] 提交 ...（中文转码失败，改用默认说明）
 git commit -q -m "update %DATE% %TIME%"
 if errorlevel 1 goto :commitfail
+goto :push
+
+rem ---------- 没有新改动：但如果还有提交没推送，也要推上去 ----------
+:nochange
+echo [2/4] 没有新的改动需要提交。
+set "AHEAD=?"
+for /f "delims=" %%c in ('git rev-list --count "@{u}..HEAD" 2^>nul') do set "AHEAD=%%c"
+if "%AHEAD%"=="0" goto :nothing
+echo       检测到有未推送的提交，继续推送到 GitHub ...
+echo.
+goto :push
+
+:nothing
+echo       本地和 GitHub 已经一致，无需操作。
+echo.
+pause
+exit /b 0
 
 :push
 echo [4/4] 推送到 GitHub ...
@@ -76,13 +93,6 @@ echo.
 echo ============================================================
 echo   已更新到 GitHub，刷新仓库页面即可看到
 echo ============================================================
-echo.
-pause
-exit /b 0
-
-:nochange
-echo.
-echo   没有检测到任何改动，无需提交。
 echo.
 pause
 exit /b 0
