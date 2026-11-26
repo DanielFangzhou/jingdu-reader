@@ -9,6 +9,19 @@
 
 ---
 
+## 直接下载使用（不懂代码也能用）
+
+不用编译、不用装环境，**去 [Releases](https://github.com/DanielFangzhou/jingdu-reader/releases) 页面**下载最新的
+`Jingdu-Reader-x.y.z-win-x64.zip`（约 100 MB），解压后双击里面的 `静读.exe` 即可运行。
+
+- Windows 10 / 11 · 64 位，免安装、不写注册表，删掉文件夹即为卸载
+- 首次运行若弹出「Windows 已保护你的电脑」，点 **更多信息 → 仍要运行**（无数字签名，属正常提示）
+- 想带走重装或换机：把整个文件夹拷到 U 盘即可，书签、笔记、阅读进度都在文件夹内的 `user-data/`
+
+> 仓库里的这些文件是**源代码**，给小改小调用的；编译好的成品放在 Releases，不进仓库（原因见下方「为什么成品不在仓库里」）。
+
+---
+
 ## 功能特性
 
 ### 阅读
@@ -77,6 +90,8 @@
 
 ## 快速开始
 
+> 以下为**从源码运行 / 打包**的步骤，普通用户请直接去 [Releases](https://github.com/DanielFangzhou/jingdu-reader/releases) 下载成品。
+
 需要 **Node.js 18+**（仅开发时需要，成品不需要）。
 
 ```bash
@@ -103,6 +118,29 @@ bash build-portable.sh
 | `update-github.bat` | **日常**更新：收集改动 → 提交（可写中文说明）→ 推送；被拒时可自动同步远程后重试 |
 
 脚本会把中文提交说明先转成 UTF-8 再交给 git（Windows 控制台默认 GBK，直接传会变成乱码）。
+
+### 发布成品（Releases）
+
+编译好的程序**不放进仓库**，而是作为附件挂在 Releases 上。两者的区别：
+
+| | Git 仓库（Code 页） | 发布（Releases 页） |
+|---|---|---|
+| 放什么 | 源代码 + 每次改动的完整历史 | 编译好的 zip 成品 |
+| 给谁 | 开发者 | 普通用户，下载解压即用 |
+| 体积限制 | 单文件 100 MB，仓库建议 < 1 GB | 单文件 2 GB，**不计入仓库体积** |
+| 能删吗 | 历史几乎删不掉，会一直累积 | 附件可随时删除替换 |
+
+原因很简单：打包后的 `静读.exe` 有 180 MB，而且**每改一行代码它就会变**，git 又会把新的一份完整存下来——几次之后就变成几个 GB 的仓库，克隆一次要等很久。Releases 就是 GitHub 为此准备的出口。
+
+发布流程：
+
+1. `bash build-portable.sh` 生成 `../dist/静读/`
+2. 双击 `make-release.bat`，自动压出 `../dist/Jingdu-Reader-<版本>-win-x64.zip`（**会剔除 `user-data/`**，避免把你的书库和阅读记录传出去）
+3. 网页打开仓库 → 右侧 **Releases → Draft a new release**
+4. Tag 填 `v1.0.1`（与 `package.json` 版本一致）→ 标题写「静读 1.0.1」→ 把 zip 拖进附件区
+5. **Publish release**
+
+之后别人点 README 里的 Releases 链接就能下载，无需懂代码。
 
 ---
 
